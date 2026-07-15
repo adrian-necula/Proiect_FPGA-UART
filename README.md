@@ -90,3 +90,22 @@ Datele receptionate sunt trimise direct catre transmitator:
 Pentru verificare am realizat testbench-ul test_top_uart, in care am trimis caracterul ASCII "A".
 
 In simulare s-a observat ca valoarea receptionata este "8'h41", iar acelasi cadru UART este transmis inapoi pe iesirea "uart_tx".
+
+## Testarea pe placa
+
+Dupa verificarea in simulare, am adaugat fisierul de constrangeri pentru clock, reset si interfata USB-UART.
+
+Configurarea folosita in PuTTY a fost:
+
+- baud rate: 9600;
+- 8 biti de date;
+- un bit de stop;
+- fara paritate;
+- fara control al fluxului;
+- local echo dezactivat.
+
+Am programat placa si am trimis mai multe caractere din PuTTY. Caracterele au fost receptionate si trimise inapoi corect.
+
+Pentru verificare, am tinut resetul activ si am observat ca textul nu se mai afisa in PuTTY. Dupa eliberarea resetului, caracterele au inceput din nou sa fie receptionate si retransmise.
+
+Acest test confirma ca textul afisat in terminal este cel trimis inapoi de placa, iar loopback-ul hardware functioneaza corect.

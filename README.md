@@ -76,3 +76,17 @@ Modulul este realizat cu o masina de stari:
 Am folosit si semnalul sample_pulse, care indica in simulare momentul in care este citit un bit.
 
 Pentru testare am simulat receptionarea caracterului ASCII "A", adica "8'h41". La finalul simularii, rx_data a avut valoarea "8'h41", iar rx_done a indicat terminarea receptiei.
+
+## Integrarea UART Loopback
+
+Dupa verificarea separata a modulelor uart_rx si uart_tx, acestea au fost conectate in modulul top_uart.
+
+Datele receptionate sunt trimise direct catre transmitator:
+
+- rx_data este conectat la tx_data;
+- rx_done este folosit pentru pornirea transmisiei;
+- acelasi caracter primit este trimis inapoi fara modificare.
+
+Pentru verificare am realizat testbench-ul test_top_uart, in care am trimis caracterul ASCII "A".
+
+In simulare s-a observat ca valoarea receptionata este "8'h41", iar acelasi cadru UART este transmis inapoi pe iesirea "uart_tx".

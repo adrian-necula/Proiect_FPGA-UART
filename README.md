@@ -22,3 +22,18 @@ La final, datele primite de la calculator vor fi trimise direct inapoi, fara sa 
 PuTTY -> uart_rx -> uart_tx -> PuTTY
 
 Pentru inceput, am ales comunicatia la 9600 baud, cu 8 biti de date, fara paritate si cu un bit de stop.
+
+## Generatorul de baud rate
+
+Primul modul implementat a fost baud_rate_generator. Acesta primeste clock-ul de 100 MHz si genereaza semnalul tick, folosit pentru temporizarea modulelor UART.
+
+Pentru inceput am ales un caz concret:
+
+- baud rate: 9600 biti/s;
+- 16 esantioane pentru fiecare bit UART;
+- clock: 100 MHz;
+- contorul numara de la 0 la 650.
+
+La fiecare atingere a valorii 650, contorul revine la 0, iar semnalul tick devine 1 pentru un singur ciclu de clock.
+
+Pentru verificare am realizat testbench-ul test_baud_rate_generator. In simulare am observat ca impulsurile tick apar periodic, la aproximativ 6,5 microsecunde.

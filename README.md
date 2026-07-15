@@ -38,6 +38,8 @@ La fiecare atingere a valorii 650, contorul revine la 0, iar semnalul tick devin
 
 Pentru verificare am realizat testbench-ul test_baud_rate_generator. In simulare am observat ca impulsurile tick apar periodic, la aproximativ 6,5 microsecunde.
 
+![Simulare baud rate generator](images/test_baud_rate_generator.png)
+
 ## Transmitatorul UART
 
 Dupa generatorul de baud rate am implementat modulul uart_tx, care primeste un byte de 8 biti si il transmite serial.
@@ -62,6 +64,8 @@ Pentru simplificarea simularii, semnalul tick a fost mentinut permanent pe 1. As
 
 Aceasta modificare este folosita doar in testbench. In sistemul real, semnalul tick va fi primit de la modulul baud_rate_generator.
 
+![Simulare UART RX](images/test_uart_rx.png)
+
 ## Receptorul UART
 
 Urmatorul modul implementat a fost uart_rx, care primeste datele serial si formeaza din nou byte-ul de 8 biti.
@@ -77,6 +81,8 @@ Am folosit si semnalul sample_pulse, care indica in simulare momentul in care es
 
 Pentru testare am simulat receptionarea caracterului ASCII "A", adica "8'h41". La finalul simularii, rx_data a avut valoarea "8'h41", iar rx_done a indicat terminarea receptiei.
 
+![Simulare UART TX](images/test_uart_tx.png)
+
 ## Integrarea UART Loopback
 
 Dupa verificarea separata a modulelor uart_rx si uart_tx, acestea au fost conectate in modulul top_uart.
@@ -90,6 +96,8 @@ Datele receptionate sunt trimise direct catre transmitator:
 Pentru verificare am realizat testbench-ul test_top_uart, in care am trimis caracterul ASCII "A".
 
 In simulare s-a observat ca valoarea receptionata este "8'h41", iar acelasi cadru UART este transmis inapoi pe iesirea "uart_tx".
+
+![Simulare UART Loopback](images/test_uart_top.png)
 
 ## Testarea pe placa
 

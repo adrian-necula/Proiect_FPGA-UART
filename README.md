@@ -58,4 +58,21 @@ Modulul este realizat cu ajutorul unei masini de stari, formata din starile:
 
 Am adaugat si semnalul bit_pulse, pentru a putea observa mai usor in simulare momentul in care incepe transmiterea unui bit nou.
 
-Pentru verificare am realizat testbench-ul test_uart_tx, in care am transmis caracterul ASCII "A", reprezentat prin valoarea "8'h41". In simulare s-au observat corect bitul de start, cei 8 biti de date si bitul de stop.
+Pentru simplificarea simularii, semnalul tick a fost mentinut permanent pe 1. Astfel, transmitatorul numara la fiecare ciclu de clock, iar fiecare bit UART este mentinut timp de 16 cicluri.
+
+Aceasta modificare este folosita doar in testbench. In sistemul real, semnalul tick va fi primit de la modulul baud_rate_generator.
+
+## Receptorul UART
+
+Urmatorul modul implementat a fost uart_rx, care primeste datele serial si formeaza din nou byte-ul de 8 biti.
+
+Modulul este realizat cu o masina de stari:
+
+- RX_IDLE - asteapta bitul de start;
+- RX_START - verifica bitul de start;
+- RX_DATA - citeste cei 8 biti de date;
+- RX_STOP - verifica bitul de stop.
+
+Am folosit si semnalul sample_pulse, care indica in simulare momentul in care este citit un bit.
+
+Pentru testare am simulat receptionarea caracterului ASCII "A", adica "8'h41". La finalul simularii, rx_data a avut valoarea "8'h41", iar rx_done a indicat terminarea receptiei.

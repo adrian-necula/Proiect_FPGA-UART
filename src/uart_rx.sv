@@ -19,31 +19,36 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
-
-module uart_rx(
+module uart_rx
+    #(parameter integer CLK_FREQ = 100_000_000,
+      parameter integer BAUD_RATE = 9_600
+)(
     input clk,
     input rst,
-    input tick,
     input rx_in,
 
     output logic [7:0] rx_data,
     output logic rx_done,
-    output logic sample_pulse
+    output logic sample_acquisition 
 );
+
+localparam integer CLKS_PER_BIT = CLK_FREQ/BAUD_RATE; // 10416
+localparam integer HALF_BIT = CLKS_PER_BIT/2; // 5208
+localparam integer COUNTER_WIDTH = $clog2(CLKS_PER_BIT); // 14 biti
 
 typedef enum logic [1:0] {
     RX_IDLE,
     RX_START,
     RX_DATA,
     RX_STOP
-} state_t;
+} rx_state_t;
 
-state_t state;
+rx_state_t current_state;
 
 logic rx_meta;
 logic rx_sync;
 
-logic [3:0] tick_count;
+logic [COUNTER_WIDTH-1:0] clock_count;
 logic [2:0] bit_index;
 logic [7:0] data_reg;
 
@@ -60,101 +65,90 @@ end
 
 always @(posedge clk) begin
     if (rst) begin
-        state        <= RX_IDLE;
-        tick_count   <= 4'd0;
-        bit_index    <= 3'd0;
-        data_reg     <= 8'd0;
-        rx_data      <= 8'd0;
-        rx_done      <= 1'b0;
-        sample_pulse <= 1'b0;
+        current_state <= RX_IDLE;
+        clock_count <= '0;
+        bit_index <= 3'd0;
+        data_reg <= 8'd0;
+        rx_data <= 8'd0;
+        rx_done <= 1'b0;
+        sample_acquisition <= 1'b0;
     end
     else begin
-        rx_done      <= 1'b0;
-        sample_pulse <= 1'b0;
+        rx_done <= 1'b0;
+        sample_acquisition <= 1'b0;
 
-        case (state)
+        case (current_state)
 
             RX_IDLE: begin
-                tick_count <= 4'd0;
-                bit_index  <= 3'd0;
+                clock_count <= '0;
+                bit_index <= 3'd0;
 
                 if (rx_sync == 1'b0) begin
-                    state <= RX_START;
+                    current_state <= RX_START;
                 end
             end
-
 
             RX_START: begin
-                if (tick) begin
+                if (clock_count == HALF_BIT - 1) begin
+                    clock_count <= '0;
+                    sample_acquisition <= 1'b1;
 
-                    if (tick_count == 4'd7) begin
-                        tick_count   <= 4'd0;
-                        sample_pulse <= 1'b1;
-
-                        if (rx_sync == 1'b0) begin
-                            state <= RX_DATA;
-                        end
-                        else begin
-                            state <= RX_IDLE;
-                        end
+                    if (rx_sync == 1'b0) begin
+                        current_state <= RX_DATA;
                     end
                     else begin
-                        tick_count <= tick_count + 4'd1;
+                        current_state <= RX_IDLE;
                     end
                 end
+                else begin
+                    clock_count <= clock_count + 1'b1;
+                end
             end
-
 
             RX_DATA: begin
-                if (tick) begin
-                    if (tick_count == 4'd15) begin
-                        tick_count           <= 4'd0;
-                        data_reg[bit_index]  <= rx_sync;
-                        sample_pulse         <= 1'b1;
+                if (clock_count == CLKS_PER_BIT - 1) begin
+                    clock_count <= '0;
+                    data_reg[bit_index] <= rx_sync;
+                    sample_acquisition <= 1'b1;
 
-                        if (bit_index == 3'd7) begin
-                            bit_index <= 3'd0;
-                            state     <= RX_STOP;
-                        end
-                        else begin
-                            bit_index <= bit_index + 3'd1;
-                        end
+                    if (bit_index == 3'd7) begin
+                        bit_index <= 3'd0;
+                        current_state <= RX_STOP;
                     end
                     else begin
-                        tick_count <= tick_count + 4'd1;
+                        bit_index <= bit_index + 3'd1;
                     end
                 end
+                else begin
+                    clock_count <= clock_count + 1'b1;
+                end
             end
-
 
             RX_STOP: begin
-                if (tick) begin
-                    if (tick_count == 4'd15) begin
-                        tick_count   <= 4'd0;
-                        sample_pulse <= 1'b1;
+                if (clock_count == CLKS_PER_BIT - 1) begin
+                    clock_count <= '0;
+                    sample_acquisition <= 1'b1;
 
-                        if (rx_sync == 1'b1) begin
-                            rx_data <= data_reg;
-                            rx_done <= 1'b1;
-                        end
+                    if (rx_sync == 1'b1) begin
+                        rx_data <= data_reg;
+                        rx_done <= 1'b1;
+                    end
 
-                        state <= RX_IDLE;
-                    end
-                    else begin
-                        tick_count <= tick_count + 4'd1;
-                    end
+                    current_state <= RX_IDLE;
+                end
+                else begin
+                    clock_count <= clock_count + 1'b1;
                 end
             end
 
-
             default: begin
-                state        <= RX_IDLE;
-                tick_count   <= 4'd0;
-                bit_index    <= 3'd0;
-                data_reg     <= 8'd0;
-                rx_data      <= 8'd0;
-                rx_done      <= 1'b0;
-                sample_pulse <= 1'b0;
+                current_state <= RX_IDLE;
+                clock_count <= '0;
+                bit_index <= 3'd0;
+                data_reg <= 8'd0;
+                rx_data <= 8'd0;
+                rx_done <= 1'b0;
+                sample_acquisition <= 1'b0;
             end
 
         endcase

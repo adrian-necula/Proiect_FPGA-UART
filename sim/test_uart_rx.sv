@@ -19,67 +19,78 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
-
 module test_uart_rx();
+
+localparam integer CLK_FREQ = 100_000_000;
+localparam integer BAUD_RATE = 9_600;
+localparam integer CLKS_PER_BIT = CLK_FREQ / BAUD_RATE;
 
 logic clk;
 logic rst;
 logic rx_in;
 
-wire tick;
+logic [3:0] uart_segment;
+
 wire [7:0] rx_data;
 wire rx_done;
-wire sample_pulse;
+wire sample_acquisition;
 
 initial begin
     clk = 1'b0;
     forever #5 clk = !clk;
 end
 
-assign tick = 1'b1;
+task send_byte(input logic [7:0] data);
+integer i;
+begin
+    // bit de start
+    uart_segment <= 4'd0;
+    rx_in <= 1'b0;
+    repeat(CLKS_PER_BIT) @(posedge clk);
 
-// A = 8'h41
-initial begin
-    rst   <= 1'b1;
+    // biti de date
+    for (i = 0; i < 8; i = i + 1) begin
+        uart_segment <= i + 1;
+        rx_in <= data[i];
+        repeat(CLKS_PER_BIT) @(posedge clk);
+    end
+
+    // bit de stop
+    uart_segment <= 4'd9;
     rx_in <= 1'b1;
+    repeat(CLKS_PER_BIT) @(posedge clk);
+    
+    uart_segment <= 4'd15;
+end
+endtask
 
-    repeat(2) @(posedge clk);
+initial begin
+    rst <= 1'b1;
+    rx_in <= 1'b1;
+    uart_segment <= 4'd15;
+
+    repeat(5) @(posedge clk);
     rst <= 1'b0;
 
-    repeat(4) @(posedge clk);
+    repeat(5) @(posedge clk);
 
-    rx_in <= 1'b0;
-    repeat(16) @(posedge clk);
+    // A = 8'h41 = 8'd56
+    send_byte(8'h41);
 
-    rx_in <= 1'b1;
-    repeat(16) @(posedge clk);
-
-    rx_in <= 1'b0;
-    repeat(80) @(posedge clk);
-
-    rx_in <= 1'b1;
-    repeat(16) @(posedge clk);
-
-    rx_in <= 1'b0;
-    repeat(16) @(posedge clk);
-
-    rx_in <= 1'b1;
-
-    wait(rx_done == 1'b1);
-
-    repeat(2) @(posedge clk);
+    repeat(5) @(posedge clk);
     $finish;
 end
 
-
-uart_rx dut (
+uart_rx #(
+    .CLK_FREQ(CLK_FREQ),
+    .BAUD_RATE(BAUD_RATE)
+) dut (
     .clk(clk),
     .rst(rst),
-    .tick(tick),
     .rx_in(rx_in),
     .rx_data(rx_data),
     .rx_done(rx_done),
-    .sample_pulse(sample_pulse)
+    .sample_acquisition(sample_acquisition)
 );
 
 endmodule

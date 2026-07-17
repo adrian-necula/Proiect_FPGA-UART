@@ -26,7 +26,7 @@ Pentru inceput, am ales comunicatia la 9600 baud, cu 8 biti de date, fara parita
 
 In prima varianta am folosit un modul separat baud_rate_generator, care genera un semnal tick de 16 ori pentru fiecare bit UART. Frecventa acestuia era calculata folosind relatia:
 
-CLK_FREQ / (BAUD_RATE * 16)
+CLKS_PER_BIT = CLK_FREQ / (BAUD_RATE * 16)
 
 Ulterior am renuntat la acest modul si am mutat temporizarea direct in uart_rx si uart_tx.
 
@@ -37,6 +37,59 @@ CLKS_PER_BIT = CLK_FREQ / BAUD_RATE
 Am ales aceasta varianta deoarece receptorul isi poate porni contorul exact in momentul in care detecteaza bitul de start. Astfel, bitul de start este verificat dupa jumatate de perioada, iar bitii de date sunt achizitionati exact la mijlocul lor.
 
 In plus, modulele pot fi parametrizate mai usor prin valorile CLK_FREQ si BAUD_RATE, fara sa mai fie necesara modificarea manuala a limitei unui generator separat.
+
+## Receptorul UART
+
+Modulul uart_rx are rolul de a receptiona datele trimise serial de la calculator si de a reconstrui caracterul primit pe 8 biti.
+
+Modulul este parametrizat prin:
+
+- CLK_FREQ - frecventa clock-ului folosit de placa;
+- BAUD_RATE - viteza comunicatiei UART.
+
+Durata unui bit este calculata automat cu relatia:
+
+CLKS_PER_BIT = CLK_FREQ / BAUD_RATE
+
+Pentru un clock de 100 MHz si un baud rate de 9600 rezulta aproximativ 10416 cicluri de clock pentru fiecare bit. In acest fel, baud rate-ul poate fi schimbat direct din parametrii modulului, fara modificarea manuala a contorului.
+
+Intrarea rx_in vine de la calculator si nu este sincronizata cu clock-ul FPGA-ului. Din acest motiv, semnalul este trecut prin doua registre, rx_meta si rx_sync, iar masina de stari foloseste doar semnalul sincronizat rx_sync.
+
+Receptia este realizata cu ajutorul unui FSM format din patru stari:
+
+- RX_IDLE - asteapta aparitia bitului de start;
+- RX_START - asteapta jumatate din durata unui bit si verifica daca linia este in continuare pe 0;
+- RX_DATA - receptioneaza cei 8 biti de date, incepand cu bitul cel mai putin semnificativ;
+- RX_STOP - verifica daca bitul de stop are valoarea 1 si valideaza caracterul primit.
+
+Validarea bitului de start dupa jumatate de perioada ajuta la evitarea unor detectii false. Dupa aceea, fiecare bit de date este citit la interval de o perioada completa, astfel incat achizitia sa se faca aproximativ la mijlocul fiecarui bit.
+
+Semnalul sample_acquisition devine 1 pentru un singur ciclu de clock atunci cand receptorul verifica sau citeste un bit. Pentru un cadru complet apar 10 impulsuri:
+
+- unul pentru bitul de start;
+- opt pentru bitii de date;
+- unul pentru bitul de stop.
+
+Dupa receptionarea corecta a bitului de stop, continutul registrului intern este copiat in rx_data, iar rx_done devine 1 pentru un singur ciclu de clock.
+
+- [Codul modulului uart_rx](src/uart_rx.sv)
+
+### Simularea receptorului
+
+Pentru verificarea modulului am transmis caracterul A, care are valoarea 8'h41.
+
+In testbench, semnalul uart_segment delimiteaza bitul de start, bitii D0-D7 si bitul de stop.
+
+Acest semnal ajuta la vizualizarea bitilor care au aceeasi valoare si intre care nu apare o tranzitie pe rx_in.
+
+In simulare se observa ca impulsurile sample_acquisition apar aproximativ la mijlocul fiecarui segment, iar FSM-ul parcurge starile:
+
+RX_IDLE -> RX_START -> RX_DATA -> RX_STOP -> RX_IDLE
+
+Semnalul bit_index numara bitii de la 0 la 7, iar data_reg este completat treptat cu valorile receptionate. La final, rx_data devine 8'h41, iar impulsul rx_done confirma ca receptia caracterului s-a terminat corect.
+
+- [Testbench pentru uart_rx](sim/test_uart_rx.sv)
+![Simulare UART RX](images/test_uart_rx.png)
 
 ## Transmitatorul UART
 
@@ -61,23 +114,6 @@ Am adaugat si semnalul bit_pulse, pentru a putea observa mai usor in simulare mo
 Pentru simplificarea simularii, semnalul tick a fost mentinut permanent pe 1. Astfel, transmitatorul numara la fiecare ciclu de clock, iar fiecare bit UART este mentinut timp de 16 cicluri.
 
 Aceasta modificare este folosita doar in testbench. In sistemul real, semnalul tick va fi primit de la modulul baud_rate_generator.
-
-![Simulare UART RX](images/test_uart_rx.png)
-
-## Receptorul UART
-
-Urmatorul modul implementat a fost uart_rx, care primeste datele serial si formeaza din nou byte-ul de 8 biti.
-
-Modulul este realizat cu o masina de stari:
-
-- RX_IDLE - asteapta bitul de start;
-- RX_START - verifica bitul de start;
-- RX_DATA - citeste cei 8 biti de date;
-- RX_STOP - verifica bitul de stop.
-
-Am folosit si semnalul sample_pulse, care indica in simulare momentul in care este citit un bit.
-
-Pentru testare am simulat receptionarea caracterului ASCII "A", adica "8'h41". La finalul simularii, rx_data a avut valoarea "8'h41", iar rx_done a indicat terminarea receptiei.
 
 ![Simulare UART TX](images/test_uart_tx.png)
 

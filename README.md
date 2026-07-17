@@ -7,38 +7,36 @@ Implementare UART TX/RX pe placa Nexys A7, verificata prin simulare si extinsa c
 PuTTY → recepție UART → (fără procesare) → transmisie UART → PuTTY.
 
 ## Rezolvare:
-Ca sursa de inspiratie am folosit videoclipurile din cursul ECE4305, modulul M8, unde este prezentata functionarea comunicatiei UART. Am gandit sistemul astfel incat fiecare parte sa fie realizata separat si verificata mai intai in simulare, iar dupa aceea modulele sa fie legate impreuna pentru realizarea loopback-ului.
+Ca sursa de inspiratie am folosit videoclipurile din cursul ECE4305, modulul M8, dar si exemplul de implementare UART prezentat pe site-ul Nandland. Am gandit sistemul astfel incat fiecare parte sa fie realizata separat si verificata mai intai in simulare, iar dupa aceea modulele sa fie legate impreuna pentru realizarea loopback-ului.
 
 Sistemul a fost impartit astfel:
 
-- un modul pentru generarea semnalului de baud rate;
 - un modul uart_tx pentru transmiterea datelor;
 - un modul uart_rx pentru receptionarea datelor;
 - cate un testbench pentru verificarea fiecarui modul;
-- un modul top_uart in care toate componentele vor fi conectate.
+- un modul top_uart pentru conectarea receptorului cu transmitatorul.
 
-La final, datele primite de la calculator vor fi trimise direct inapoi, fara sa fie modificate:
+Datele primite de la calculator sunt trimise direct inapoi, fara sa fie modificate:
 
 PuTTY -> uart_rx -> uart_tx -> PuTTY
 
 Pentru inceput, am ales comunicatia la 9600 baud, cu 8 biti de date, fara paritate si cu un bit de stop.
 
-## Generatorul de baud rate
+## Modificarea metodei de temporizare
 
-Primul modul implementat a fost baud_rate_generator. Acesta primeste clock-ul de 100 MHz si genereaza semnalul tick, folosit pentru temporizarea modulelor UART.
+In prima varianta am folosit un modul separat baud_rate_generator, care genera un semnal tick de 16 ori pentru fiecare bit UART. Frecventa acestuia era calculata folosind relatia:
 
-Pentru inceput am ales un caz concret:
+CLK_FREQ / (BAUD_RATE * 16)
 
-- baud rate: 9600 biti/s;
-- 16 esantioane pentru fiecare bit UART;
-- clock: 100 MHz;
-- contorul numara de la 0 la 650.
+Ulterior am renuntat la acest modul si am mutat temporizarea direct in uart_rx si uart_tx.
 
-La fiecare atingere a valorii 650, contorul revine la 0, iar semnalul tick devine 1 pentru un singur ciclu de clock.
+Noua metoda calculeaza direct numarul de cicluri de clock corespunzator unui bit:
 
-Pentru verificare am realizat testbench-ul test_baud_rate_generator. In simulare am observat ca impulsurile tick apar periodic, la aproximativ 6,5 microsecunde.
+CLKS_PER_BIT = CLK_FREQ / BAUD_RATE
 
-![Simulare baud rate generator](images/test_baud_rate_generator.png)
+Am ales aceasta varianta deoarece receptorul isi poate porni contorul exact in momentul in care detecteaza bitul de start. Astfel, bitul de start este verificat dupa jumatate de perioada, iar bitii de date sunt achizitionati exact la mijlocul lor.
+
+In plus, modulele pot fi parametrizate mai usor prin valorile CLK_FREQ si BAUD_RATE, fara sa mai fie necesara modificarea manuala a limitei unui generator separat.
 
 ## Transmitatorul UART
 

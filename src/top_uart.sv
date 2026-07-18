@@ -19,7 +19,10 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
-module top_uart(
+module top_uart
+    #(parameter integer CLK_FREQ = 100_000_000,
+      parameter integer BAUD_RATE = 9_600
+)(
     input clk,
     input btn_rst,
     input uart_rx,
@@ -29,15 +32,14 @@ module top_uart(
 wire clk_sys;
 wire clk_locked;
 wire rst_global;
-wire tick_uart;
 
 wire [7:0] rx_data;
 wire rx_done;
-wire sample_pulse;
+wire sample_acquisition;
 
 wire tx_busy;
 wire tx_done;
-wire bit_pulse;
+wire bit_start;
 
 clk_wiz_uart c1 (
     .clk_out1(clk_sys),
@@ -46,34 +48,32 @@ clk_wiz_uart c1 (
     .clk_in1(clk)
 );
 
-assign rst_global = btn_rst | ~clk_locked;
+assign rst_global = btn_rst | !clk_locked;
 
-baud_rate_generator c2 (
+uart_rx #(
+    .CLK_FREQ(CLK_FREQ),
+    .BAUD_RATE(BAUD_RATE)
+) c2 (
     .clk(clk_sys),
     .rst(rst_global),
-    .tick(tick_uart)
-);
-
-uart_rx c3 (
-    .clk(clk_sys),
-    .rst(rst_global),
-    .tick(tick_uart),
     .rx_in(uart_rx),
     .rx_data(rx_data),
     .rx_done(rx_done),
-    .sample_pulse(sample_pulse)
+    .sample_acquisition(sample_acquisition)
 );
 
-uart_tx c4 (
+uart_tx #(
+    .CLK_FREQ(CLK_FREQ),
+    .BAUD_RATE(BAUD_RATE)
+) c3 (
     .clk(clk_sys),
     .rst(rst_global),
-    .tick(tick_uart),
     .tx_start(rx_done),
     .tx_data(rx_data),
     .tx_out(uart_tx),
     .tx_busy(tx_busy),
     .tx_done(tx_done),
-    .bit_pulse(bit_pulse)
+    .bit_start(bit_start)
 );
 
 endmodule

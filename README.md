@@ -6,6 +6,7 @@ Implementare UART TX/RX pe placa Nexys A7, verificata prin simulare si extinsa c
 În această etapă implementați și verificați modulele UART de bază. Scopul este să demonstrați că tot ce trimiteți din PuTTY vă vine înapoi corect pe același terminal (loopback hardware):
 PuTTY → recepție UART → (fără procesare) → transmisie UART → PuTTY.
 
+
 ## Rezolvare:
 Ca sursa de inspiratie am folosit videoclipurile din cursul ECE4305, modulul M8, dar si exemplul de implementare UART prezentat pe site-ul Nandland. Am gandit sistemul astfel incat fiecare parte sa fie realizata separat si verificata mai intai in simulare, iar dupa aceea modulele sa fie legate impreuna pentru realizarea loopback-ului.
 
@@ -22,11 +23,12 @@ PuTTY -> uart_rx -> uart_tx -> PuTTY
 
 Pentru inceput, am ales comunicatia la 9600 baud, cu 8 biti de date, fara paritate si cu un bit de stop.
 
+
 ## Modificarea metodei de temporizare
 
 In prima varianta am folosit un modul separat baud_rate_generator, care genera un semnal tick de 16 ori pentru fiecare bit UART. Frecventa acestuia era calculata folosind relatia:
 
-CLKS_PER_BIT = CLK_FREQ / (BAUD_RATE * 16)
+CLKS_PER_TICK = CLK_FREQ / (BAUD_RATE * 16)
 
 Ulterior am renuntat la acest modul si am mutat temporizarea direct in uart_rx si uart_tx.
 
@@ -37,6 +39,7 @@ CLKS_PER_BIT = CLK_FREQ / BAUD_RATE
 Am ales aceasta varianta deoarece receptorul isi poate porni contorul exact in momentul in care detecteaza bitul de start. Astfel, bitul de start este verificat dupa jumatate de perioada, iar bitii de date sunt achizitionati exact la mijlocul lor.
 
 In plus, modulele pot fi parametrizate mai usor prin valorile CLK_FREQ si BAUD_RATE, fara sa mai fie necesara modificarea manuala a limitei unui generator separat.
+
 
 ## Receptorul UART
 
@@ -74,6 +77,7 @@ Dupa receptionarea corecta a bitului de stop, continutul registrului intern este
 
 - [Codul modulului uart_rx](src/uart_rx.sv)
 
+
 ### Simularea receptorului
 
 Pentru verificarea modulului am transmis caracterul A, care are valoarea 8'h41.
@@ -91,6 +95,7 @@ Semnalul bit_index numara bitii de la 0 la 7, iar data_reg este completat trepta
 - [Testbench pentru uart_rx](sim/test_uart_rx.sv)
 
 ![Simulare UART RX](images/test_uart_rx.png)
+
 
 ## Transmitatorul UART
 
@@ -122,6 +127,7 @@ Semnalul tx_busy ramane activ pe toata durata transmisiei, iar tx_done devine 1 
 
 - [Codul modulului uart_tx](src/uart_tx.sv)
 
+
 ### Simularea transmitatorului
 
 Pentru verificare a fost transmis caracterul A, care are valoarea: A = 8'h41 = 0100_0001
@@ -142,21 +148,56 @@ La finalul transmisiei, tx_done genereaza un impuls, iar tx_out revine pe 1, car
 
 ![Simulare UART TX](images/test_uart_tx.png)
 
-## Integrarea UART Loopback
 
-Dupa verificarea separata a modulelor uart_rx si uart_tx, acestea au fost conectate in modulul top_uart.
+## Modulul de top si realizarea loopback-ului
 
-Datele receptionate sunt trimise direct catre transmitator:
+Modulul top_uart are rolul de a conecta receptorul uart_rx cu transmitatorul uart_tx si de a realiza comunicatia de tip loopback.
 
-- rx_data este conectat la tx_data;
-- rx_done este folosit pentru pornirea transmisiei;
-- acelasi caracter primit este trimis inapoi fara modificare.
+La fel ca modulele RX si TX, modulul de top este parametrizat prin:
 
-Pentru verificare am realizat testbench-ul test_top_uart, in care am trimis caracterul ASCII "A".
+- CLK_FREQ - frecventa clock-ului sistemului;
+- BAUD_RATE - viteza comunicatiei UART.
 
-In simulare s-a observat ca valoarea receptionata este "8'h41", iar acelasi cadru UART este transmis inapoi pe iesirea "uart_tx".
+Acesti parametri sunt transmisi mai departe catre receptor si transmitator, astfel incat ambele module sa foloseasca aceeasi frecventa si acelasi baud rate.
+
+Clock-ul placii este conectat la modulul clk_wiz_uart, care genereaza semnalul intern clk_sys. Semnalul clk_locked indica faptul ca iesirea Clocking Wizard-ului este stabila.
+
+Resetul general este obtinut prin relatia: rst_global = btn_rst | !clk_locked.
+
+Astfel, sistemul ramane in reset atunci cand butonul este apasat sau cat timp clock-ul intern nu este stabil.
+
+Realizarea loopback-ului se face prin conectarea directa a receptorului cu transmitatorul:
+
+rx_data -> tx_data
+rx_done -> tx_start
+
+Cand uart_rx termina receptionarea unui caracter, acesta pune valoarea pe rx_data si genereaza un impuls pe rx_done. Impulsul porneste transmitatorul, care trimite inapoi acelasi caracter prin iesirea uart_tx.
+
+Fluxul complet este:
+
+PuTTY -> uart_rx -> rx_data -> uart_tx -> PuTTY
+
+- [Codul modulului top_uart](src/top_uart.sv)
+
+
+### Simularea loopback-ului
+
+Pentru verificarea sistemului complet a fost transmis caracterul A = 8'h41.
+
+Testbench-ul genereaza cadrul UART pe intrarea uart_rx, iar semnalul uart_segment delimiteaza bitul de start, bitii D0-D7 si bitul de stop.
+
+Impulsurile sample_acquisition arata momentele in care receptorul citeste fiecare bit. Dupa terminarea receptiei, rx_data devine 8'h41, iar rx_done porneste automat transmitatorul.
+
+Pe iesirea uart_tx apare apoi acelasi cadru UART. Semnalul bit_start marcheaza inceputul fiecarui bit transmis, tx_busy arata ca transmisia este in desfasurare, iar tx_done confirma terminarea acesteia.
+
+Simularea confirma functionarea intregului traseu:
+
+uart_rx -> receptie 8'h41 -> pornire uart_tx -> retransmitere 8'h41
+
+- [Testbench pentru top_uart](sim/test_top_uart.sv)
 
 ![Simulare UART Loopback](images/test_uart_top.png)
+
 
 ## Testarea pe placa
 

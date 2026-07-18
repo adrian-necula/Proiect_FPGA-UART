@@ -89,31 +89,56 @@ RX_IDLE -> RX_START -> RX_DATA -> RX_STOP -> RX_IDLE
 Semnalul bit_index numara bitii de la 0 la 7, iar data_reg este completat treptat cu valorile receptionate. La final, rx_data devine 8'h41, iar impulsul rx_done confirma ca receptia caracterului s-a terminat corect.
 
 - [Testbench pentru uart_rx](sim/test_uart_rx.sv)
+
 ![Simulare UART RX](images/test_uart_rx.png)
 
 ## Transmitatorul UART
 
-Dupa generatorul de baud rate am implementat modulul uart_tx, care primeste un byte de 8 biti si il transmite serial.
+Modulul uart_tx are rolul de a transforma un caracter primit pe 8 biti intr-un semnal serial UART, care poate fi transmis catre calculator.
 
-Transmiterea unui caracter este realizata astfel:
+La fel ca receptorul, modulul este parametrizat prin:
 
-- un bit de start, cu valoarea 0;
-- 8 biti de date, transmisi de la LSB la MSB;
-- un bit de stop, cu valoarea 1;
-- fiecare bit este mentinut timp de 16 impulsuri tick.
+- CLK_FREQ - frecventa clock-ului folosit de placa;
+- BAUD_RATE - viteza comunicatiei UART.
 
-Modulul este realizat cu ajutorul unei masini de stari, formata din starile:
+Durata unui bit este calculata cu relatia:
 
-- TX_IDLE;
-- TX_START;
-- TX_DATA;
-- TX_STOP.
+CLKS_PER_BIT = CLK_FREQ / BAUD_RATE
 
-Am adaugat si semnalul bit_pulse, pentru a putea observa mai usor in simulare momentul in care incepe transmiterea unui bit nou.
+Pentru un clock de 100 MHz si un baud rate de 9600 rezulta aproximativ 10416 cicluri de clock pentru fiecare bit. Astfel, valoarea baud rate-ului poate fi schimbata direct din parametrii modulului.
 
-Pentru simplificarea simularii, semnalul tick a fost mentinut permanent pe 1. Astfel, transmitatorul numara la fiecare ciclu de clock, iar fiecare bit UART este mentinut timp de 16 cicluri.
+Transmisia este realizata cu ajutorul unui FSM format din patru stari:
 
-Aceasta modificare este folosita doar in testbench. In sistemul real, semnalul tick va fi primit de la modulul baud_rate_generator.
+- TX_IDLE - asteapta aparitia semnalului tx_start, iar linia tx_out este mentinuta pe 1;
+- TX_START - transmite bitul de start, cu valoarea 0;
+- TX_DATA - transmite cei 8 biti din data_reg, incepand cu bitul cel mai putin semnificativ;
+- TX_STOP - transmite bitul de stop, cu valoarea 1, apoi revine in starea de repaus.
+
+Cand tx_start devine 1, valoarea de pe tx_data este salvata in registrul intern data_reg. Acest lucru permite transmiterea caracterului fara ca eventualele modificari ulterioare ale intrarii tx_data sa afecteze cadrul deja inceput.
+
+Fiecare bit este mentinut pe iesirea tx_out timp de CLKS_PER_BIT cicluri. Semnalul bit_start genereaza un impuls la inceputul fiecarui bit transmis, iar bit_index indica bitul de date curent.
+
+Semnalul tx_busy ramane activ pe toata durata transmisiei, iar tx_done devine 1 pentru un singur ciclu de clock dupa terminarea bitului de stop.
+
+- [Codul modulului uart_tx](src/uart_tx.sv)
+
+### Simularea transmitatorului
+
+Pentru verificare a fost transmis caracterul A, care are valoarea: A = 8'h41 = 0100_0001
+
+Deoarece UART transmite bitul cel mai putin semnificativ primul, ordinea bitilor pe iesirea seriala este:
+
+D0...D7 = 1 0 0 0 0 0 1 0
+
+In simulare se observa trecerea FSM-ului prin starile:
+
+TX_IDLE -> TX_START -> TX_DATA -> TX_STOP -> TX_IDLE
+
+Semnalul bit_start marcheaza inceputul fiecarui bit, iar bit_index numara bitii de date de la 0 la 7. Pe iesirea tx_out apare cadrul serial corespunzator caracterului 8'h41.
+
+La finalul transmisiei, tx_done genereaza un impuls, iar tx_out revine pe 1, care reprezinta starea de repaus a liniei UART.
+
+- [Testbench pentru uart_tx](sim/test_uart_tx.sv)
 
 ![Simulare UART TX](images/test_uart_tx.png)
 

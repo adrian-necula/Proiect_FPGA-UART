@@ -62,7 +62,7 @@ initial begin
 
     repeat(5) @(posedge clk);
 
-    // A = 8'h41 = 1000_0010 
+    // A = 8'h41 = 0100_0001 
     send_byte(8'h41);
 
     repeat(5) @(posedge clk);

@@ -21,57 +21,66 @@
 
 module test_uart_tx();
 
+localparam integer CLK_FREQ = 100_000_000;
+localparam integer BAUD_RATE = 9_600;
+
 logic clk;
 logic rst;
 logic tx_start;
 logic [7:0] tx_data;
 
-wire tick;
 wire tx_out;
 wire tx_busy;
 wire tx_done;
-wire bit_pulse;
+wire bit_start;
 
 initial begin
     clk = 1'b0;
-    forever #5 clk = ~clk;
+    forever #5 clk = !clk;
 end
 
-assign tick = 1'b1;
-
-//A = 8'h41
-initial begin
-    rst      <= 1'b1;
-    tx_start <= 1'b0;
-    tx_data  <= 8'd0;
-
-    repeat(2) @(posedge clk);
-    rst <= 1'b0;
-
-    repeat(2) @(posedge clk);
-
-    tx_data  <= 8'h41;
+task send_byte(input logic [7:0] data);
+begin
+    @(negedge clk);
+    tx_data <= data;
     tx_start <= 1'b1;
 
-    @(posedge clk);
+    @(negedge clk);
     tx_start <= 1'b0;
 
     wait(tx_done == 1'b1);
+end 
+endtask
 
-    repeat(2) @(posedge clk);
+initial begin
+    rst <= 1'b1;
+    tx_start <= 1'b0;
+    tx_data <= 8'd0;
+
+    repeat(5) @(posedge clk);
+    rst <= 1'b0;
+
+    repeat(5) @(posedge clk);
+
+    // A = 8'h41 = 1000_0010 
+    send_byte(8'h41);
+
+    repeat(5) @(posedge clk);
     $finish;
 end
 
-uart_tx dut (
+uart_tx #(
+    .CLK_FREQ(CLK_FREQ),
+    .BAUD_RATE(BAUD_RATE)
+) dut (
     .clk(clk),
     .rst(rst),
-    .tick(tick),
     .tx_start(tx_start),
     .tx_data(tx_data),
     .tx_out(tx_out),
     .tx_busy(tx_busy),
     .tx_done(tx_done),
-    .bit_pulse(bit_pulse)
+    .bit_start(bit_start)
 );
 
 endmodule

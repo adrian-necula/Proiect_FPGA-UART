@@ -218,7 +218,7 @@ Pentru verificare, am tinut resetul activ si am observat ca textul nu se mai afi
 
 Acest test confirma ca textul afisat in terminal este cel trimis inapoi de placa, iar loopback-ul hardware functioneaza corect.
 
-- [Fisierul de constrangeri](constraints/Nexys-A7-100T-Master.xdc)
+- [Fisierul de constrangeri](constraints/top_uart.xdc)
 
 ## Probleme intampinate si rezolvari
 

@@ -217,3 +217,33 @@ Am programat placa si am trimis mai multe caractere din PuTTY. Caracterele au fo
 Pentru verificare, am tinut resetul activ si am observat ca textul nu se mai afisa in PuTTY. Dupa eliberarea resetului, caracterele au inceput din nou sa fie receptionate si retransmise.
 
 Acest test confirma ca textul afisat in terminal este cel trimis inapoi de placa, iar loopback-ul hardware functioneaza corect.
+
+- [Fisierul de constrangeri](constraints/Nexys-A7-100T-Master.xdc)
+
+## Probleme intampinate si rezolvari
+
+In prima varianta am folosit un modul separat baud_rate_generator, care genera 16 impulsuri tick pentru fiecare bit UART.
+
+Numarul de cicluri dintre doua impulsuri era calculat cu relatia:
+
+CLKS_PER_TICK = CLK_FREQ / (BAUD_RATE * 16)
+
+Receptorul astepta 8 impulsuri pentru validarea bitului de start si apoi cate 16 impulsuri pentru fiecare bit de date.
+
+Varianta aceasta a functionat in PuTTY deoarece cei 16 pasi de temporizare pe bit au fost suficienti pentru ca receptorul sa citeasca datele intr-o zona stabila. Chiar daca momentul achizitiei nu era exact in centrul bitului, abaterea era mica si nu afecta comunicatia.
+
+Problema era ca generatorul functiona continuu si nu isi reseta numararea exact la detectarea bitului de start. Din acest motiv, impulsul de achizitie putea fi deplasat putin fata de mijlocul ideal al bitului. Comunicatia functiona pe placa, dar in waveform impulsurile nu apareau mereu exact in centrul segmentelor.
+
+In plus, in primele testbench-uri am folosit tick = 1 pentru a scurta simularea. Aceasta metoda verifica succesiunea starilor, dar nu reproducea temporizarea reala de 9600 baud, motiv pentru care waveform-ul nu era foarte reprezentativ.
+
+Pentru rezolvare am eliminat generatorul separat si am mutat temporizarea direct in modulele uart_rx si uart_tx, noua relatie folosita fiind:
+
+CLKS_PER_BIT = CLK_FREQ / BAUD_RATE
+
+La receptie, contorul porneste atunci cand este detectat bitul de start. Acesta asteapta CLKS_PER_BIT / 2 pentru validarea startului, apoi cate CLKS_PER_BIT cicluri pentru fiecare bit de date si pentru bitul de stop.
+
+La transmisie, fiecare bit este mentinut pe iesire timp de CLKS_PER_BIT cicluri.
+
+Am adaugat si semnalele sample_acquisition, bit_start si uart_segment, pentru ca momentele de receptie si limitele fiecarui bit sa fie mai usor de urmarit in simulare.
+
+Noua implementare a facut temporizarea mai clara in waveform si permite schimbarea baud rate-ului direct prin parametrii CLK_FREQ si BAUD_RATE.

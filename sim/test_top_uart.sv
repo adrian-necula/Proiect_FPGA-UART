@@ -21,23 +21,51 @@
 
 module test_top_uart();
 
+localparam integer CLK_FREQ = 100_000_000;
+localparam integer BAUD_RATE = 9_600;
+localparam integer CLKS_PER_BIT = CLK_FREQ / BAUD_RATE;
+
 logic clk;
 logic btn_rst;
 logic uart_rx;
 
-wire uart_tx;
+logic [3:0] uart_segment;
 
-localparam integer clocks_per_bit = 10416;
+wire uart_tx;
 
 initial begin
     clk = 1'b0;
     forever #5 clk = !clk;
 end
 
-//A = 8'h41
+task send_byte(input logic [7:0] data);
+integer i;
+begin
+    // bit de start
+    uart_segment <= 4'd0;
+    uart_rx <= 1'b0;
+    repeat(CLKS_PER_BIT) @(posedge clk);
+
+    // biti de date LSB -> MSB
+    for (i = 0; i < 8; i = i + 1) begin
+        uart_segment <= i + 1;
+        uart_rx <= data[i];
+        repeat(CLKS_PER_BIT) @(posedge clk);
+    end
+
+    // bit de stop
+    uart_segment <= 4'd9;
+    uart_rx <= 1'b1;
+    repeat(CLKS_PER_BIT) @(posedge clk);
+    
+    uart_segment <= 4'd15;
+end
+endtask
+
 initial begin
     btn_rst <= 1'b1;
     uart_rx <= 1'b1;
+    uart_segment <= 4'd15;
 
     repeat(5) @(posedge clk);
     btn_rst <= 1'b0;
@@ -45,33 +73,19 @@ initial begin
     wait(dut.clk_locked == 1'b1);
     repeat(10) @(posedge clk);
 
-    uart_rx <= 1'b0;
-    repeat(clocks_per_bit) @(posedge clk);
-
-    uart_rx <= 1'b1;
-    repeat(clocks_per_bit) @(posedge clk);
-
-    uart_rx <= 1'b0;
-    repeat(5 * clocks_per_bit) @(posedge clk);
-
-    uart_rx <= 1'b1;
-    repeat(clocks_per_bit) @(posedge clk);
-
-    uart_rx <= 1'b0;
-    repeat(clocks_per_bit) @(posedge clk);
-
-    uart_rx <= 1'b1;
-    repeat(clocks_per_bit) @(posedge clk);
-
-    wait(dut.rx_data == 8'h41);
+    // A = 8'h41
+    send_byte(8'h41);
 
     wait(dut.tx_done == 1'b1);
 
-    repeat(2) @(posedge clk);
+    repeat(5) @(posedge clk);
     $finish;
 end
 
-top_uart dut (
+top_uart #(
+    .CLK_FREQ(CLK_FREQ),
+    .BAUD_RATE(BAUD_RATE)
+) dut (
     .clk(clk),
     .btn_rst(btn_rst),
     .uart_rx(uart_rx),

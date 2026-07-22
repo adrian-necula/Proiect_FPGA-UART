@@ -370,3 +370,101 @@ In simulare am urmarit intrarea count in format hexazecimal si iesirea ascii_hex
 ![Simulare conversie ASCII](images/test_counter_to_ascii.png)
 
 
+## Controlul comenzilor si generarea mesajelor UART
+
+Pentru coordonarea comenzilor primite am realizat modulul uart_command_control. Acesta primeste codul generat de uart_command_decoder si decide ce operatie trebuie efectuata asupra counter-ului.
+
+In functie de comanda primita, modulul genereaza un impuls pentru unul dintre semnalele:
+
+- inc - incrementarea counter-ului;
+- dec - decrementarea counter-ului;
+- count_reset - resetarea counter-ului.
+
+Pentru comenzile de status si help, valoarea counter-ului nu este modificata, fiind solicitata doar transmiterea mesajului corespunzator.
+
+Am inclus in acelasi modul si gestionarea butoanelor fizice. Impulsurile btn_inc_pulse, btn_dec_pulse si btn_reset_pulse sunt interpretate ca evenimente separate fata de comenzile primite din terminal.
+
+Daca un buton este apasat in timp ce un mesaj este deja in curs, evenimentul este memorat printr-un semnal pending si este procesat dupa finalizarea mesajului curent.
+
+Modulul trateaza si cazurile limita ale counter-ului:
+
+- incrementarea valorii 0xFFFF genereaza mesajul de overflow;
+- decrementarea valorii 0x0000 genereaza mesajul de underflow.
+
+Pentru fiecare actiune este generat un cod message_code, care indica modulului message_sender ce mesaj trebuie transmis.
+
+La pornirea sistemului, dupa reset, este generat automat codul MSG_WELCOME. Astfel, primul mesaj transmis este mesajul de bun venit si indicatia ca tasta ? afiseaza meniul de ajutor.
+
+Modulul foloseste o masina de stari cu trei stari:
+
+- WAIT_EVENT - asteapta o comanda UART sau o apasare de buton;
+- START_MESSAGE - genereaza impulsul message_start;
+- WAIT_MESSAGE - asteapta semnalul message_done.
+
+- [Codul modulului uart_command_control](src/uart_command_control.sv)
+
+
+### Simularea modulului de control
+
+Pentru verificarea modulului am testat mai intai generarea automata a mesajului de bun venit dupa reset.
+
+Am testat apoi comanda UART I, apasarea butonului de decrementare si apasarea butonului de reset. In simulare am urmarit impulsurile inc, dec si count_reset, precum si codul mesajului selectat pentru fiecare eveniment.
+
+Am observat ca message_start este activ pentru un singur ciclu de clock, iar modulul asteapta semnalul message_done inainte de a procesa urmatoarea cerere.
+
+Simularea a confirmat functionarea corecta a masinii de stari si alegerea mesajului potrivit pentru fiecare comanda.
+
+- [Testbench pentru uart_command_control](sim/test_command_control.sv)
+
+![Simulare control comenzi](images/test_command_control.png)
+
+
+## Generarea mesajelor pentru terminal
+
+Pentru transmiterea raspunsurilor am realizat modulul message_sender. Acesta primeste message_code, valoarea counter-ului deja convertita in format ASCII si caracterul necunoscut, atunci cand este cazul.
+
+In functie de message_code, modulul selecteaza mesajul care trebuie transmis. Am folosit formatele prezentate in fisierul pdf:
+
+[CMD] INC | Counter: 0x0001
+[BTN] DEC | Counter: 0x0000
+[STATUS] Counter: 0x000A
+[WARN] Overflow | Counter: 0x0000
+[ERR] Unknown: 'X'
+
+Am adaugat si mesajul de bun venit:
+
+UART Counter Logger
+Press ? for help
+
+Mesajul selectat este incarcat intr-un registru intern, iar caracterele sunt trimise pe rand catre TX FIFO.
+
+Iesirea tx_fifo_din contine caracterul curent, iar tx_fifo_wr_en este activ doar atunci cand modulul transmite si TX FIFO nu este plin.
+
+Daca tx_fifo_full devine 1, transmiterea este oprita temporar. Caracterul curent ramane pastrat, iar trimiterea continua dupa ce apare din nou spatiu liber in FIFO.
+
+Semnalul busy ramane activ pe durata generarii mesajului, iar done devine 1 pentru un singur ciclu dupa introducerea ultimului caracter in TX FIFO.
+
+O cerere noua primita in timp ce busy este activ nu modifica mesajul curent. Comenzile UART raman in RX FIFO, iar evenimentele butoanelor sunt memorate de modulul de control si sunt procesate ulterior.
+
+- [Codul modulului message_sender](src/message_sender.sv)
+
+
+### Simularea generatorului de mesaje
+
+Pentru verificare am selectat mesajul MSG_INC si valoarea counter-ului 0x3A7F.
+
+In simulare am observat pe tx_fifo_din urmatoarea succesiune de caractere:
+
+[CMD] INC | Counter: 0x3A7F
+
+La final au fost transmise caracterele CR si LF, folosite pentru trecerea pe rand nou in terminal.
+
+Semnalul tx_fifo_wr_en a ramas activ pentru fiecare caracter valid, busy a fost activ pe toata durata mesajului, iar done a generat un singur impuls dupa ultimul caracter.
+
+Simularea a confirmat transmiterea corecta a mesajului byte cu byte si oprirea temporara atunci cand FIFO-ul nu este disponibil.
+
+- [Testbench pentru message_sender](sim/test_message_sender.sv)
+
+![Simulare generator mesaje](images/test_message_sender.png)
+
+

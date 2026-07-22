@@ -257,6 +257,54 @@ Pe lângă comenzile primite de la PC, la fiecare apăsare a unui buton fizic FP
 ## Rezolvare: 
 Pentru proiectarea Etapei 2 am pornit de la comunicatia UART realizata anterior si am urmarit sa obtinem un sistem care sa poata primi comenzi din terminal, sa modifice un counter pe 16 biti si sa raporteze inapoi fiecare actiune facuta.
 
-Am ales sa folosim doua FIFO-uri, unul pentru comenzile primite si unul pentru mesajele transmise, astfel incat datele sa nu se piarda atunci cand sistemul este ocupat. Comenzile sunt interpretate separat, iar valoarea counter-ului este transformata in formatul 0xXXXX pentru a putea fi afisata usor in terminal.
+Am ales sa folosesc doua FIFO-uri, unul pentru comenzile primite si unul pentru mesajele transmise, astfel incat datele sa nu se piarda atunci cand sistemul este ocupat. Comenzile sunt interpretate separat, iar valoarea counter-ului este transformata in formatul 0xXXXX pentru a putea fi afisata usor in terminal.
 
 Pentru butoane am reutilizat modulele de sincronizare, debounce si detectare de front, astfel incat o apasare sa produca o singura comanda. Am avut in vedere si cazurile de overflow, underflow, comenzile necunoscute, mesajul de bun venit si meniul de ajutor.
+
+## Adaugarea FIFO-urilor si decodarea comenzilor UART
+
+Pentru gestionarea datelor primite si transmise am adaugat doua FIFO-uri pe 8 biti, unul pentru receptie si unul pentru transmisie.
+
+RX FIFO are rolul de a pastra caracterele primite de modulul uart_rx pana cand acestea pot fi procesate. Am ales aceasta varianta pentru ca o comanda noua sa nu se piarda atunci cand sistemul este ocupat cu generarea sau transmiterea unui mesaj.
+
+TX FIFO pastreaza caracterele generate de modulul message_sender pana cand transmitatorul uart_tx este disponibil. Astfel, mesajele pot fi generate rapid, iar uart_tx le transmite ulterior byte cu byte, in functie de baud rate.
+
+Am configurat FIFO-ul cu interfata Native, clock comun pentru scriere si citire, latimea datelor de 8 biti si modul First Word Fall Through. Am folosit acelasi IP de doua ori, o data pentru RX FIFO si o data pentru TX FIFO.
+
+Am realizat si modulul uart_command_decoder, care primeste caracterul de la iesirea RX FIFO si il transforma intr-un cod de comanda folosit ulterior de modulul de control.
+
+Comenzile recunoscute sunt:
+
+- I/i - incrementare;
+- D/d - decrementare;
+- R/r - reset;
+- S/s - afisarea valorii curente;
+- ? - afisarea meniului de ajutor.
+
+Pentru orice alt caracter, modulul genereaza comanda CMD_UNKNOWN.
+
+- [Codul modulului uart_command_decoder](src/uart_command_decoder.sv)
+
+
+### Simularea FIFO-ului
+
+Pentru verificarea FIFO-ului am scris succesiv caracterele A, B si C si am urmarit iesirea, semnalele de scriere si citire, precum si starile empty si full.
+
+Deoarece FIFO-ul functioneaza in modul First Word Fall Through, primul caracter scris apare direct pe iesire atunci cand FIFO-ul nu mai este gol. La fiecare activare a semnalului rd_en este eliminat caracterul curent si apare urmatorul.
+
+Simularea a confirmat ca datele sunt pastrate si citite in ordinea in care au fost introduse.
+
+- [Testbench pentru FIFO](sim/test_fifo_uart.sv)
+
+![Simulare FIFO](images/test_fifo_uart.png)
+
+
+### Simularea decodorului de comenzi
+
+Pentru verificarea modulului uart_command_decoder am aplicat pe rand comenzile I, i, D, d, R, r, S, s si ?. Am testat si un caracter care nu face parte din lista comenzilor acceptate.
+
+In simulare am observat ca fiecare caracter valid este transformat in codul de comanda corespunzator, iar pentru caracterul necunoscut este generat CMD_UNKNOWN.
+
+- [Testbench pentru uart_command_decoder](sim/test_uart_command_decoder.sv)
+
+![Simulare decodor comenzi](images/test_uart_command_decoder.png)

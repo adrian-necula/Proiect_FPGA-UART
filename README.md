@@ -254,12 +254,14 @@ Porniți de la Etapa 1 funcțională și integrați counter-ul binar din proiect
 
 Pe lângă comenzile primite de la PC, la fiecare apăsare a unui buton fizic FPGA-ul trebuie să trimită automat, fără intervenție de la PC, un mesaj corespunzător evenimentului: apăsare buton de incrementare, decrementare, reset, precum și cazurile de overflow / underflow ale counter-ului — alegeți un format de mesaj consistent și documentat, similar ca stil cu răspunsurile din tabelul de comenzi. La pornirea sistemului (după reset inițial), FPGA-ul trebuie să trimită automat un mesaj de bun venit și o indicație scurtă că '?' afișează meniul de ajutor; formatarea exactă a meniului rămâne la alegerea voastră, atât timp cât este clară și consistentă cu restul mesajelor.
 
+
 ## Rezolvare: 
 Pentru proiectarea Etapei 2 am pornit de la comunicatia UART realizata anterior si am urmarit sa obtinem un sistem care sa poata primi comenzi din terminal, sa modifice un counter pe 16 biti si sa raporteze inapoi fiecare actiune facuta.
 
 Am ales sa folosesc doua FIFO-uri, unul pentru comenzile primite si unul pentru mesajele transmise, astfel incat datele sa nu se piarda atunci cand sistemul este ocupat. Comenzile sunt interpretate separat, iar valoarea counter-ului este transformata in formatul 0xXXXX pentru a putea fi afisata usor in terminal.
 
 Pentru butoane am reutilizat modulele de sincronizare, debounce si detectare de front, astfel incat o apasare sa produca o singura comanda. Am avut in vedere si cazurile de overflow, underflow, comenzile necunoscute, mesajul de bun venit si meniul de ajutor.
+
 
 ## Adaugarea FIFO-urilor si decodarea comenzilor UART
 
@@ -308,3 +310,63 @@ In simulare am observat ca fiecare caracter valid este transformat in codul de c
 - [Testbench pentru uart_command_decoder](sim/test_uart_command_decoder.sv)
 
 ![Simulare decodor comenzi](images/test_uart_command_decoder.png)
+
+
+## Integrarea counter-ului si conversia valorii in format ASCII
+
+Am reutilizat counter-ul pe 16 biti realizat in proiectul anterior si l-am adaptat pentru comenzile primite din terminal si pentru butoanele fizice.
+
+Modulul poate realiza trei operatii:
+
+- incrementare prin semnalul inc;
+- decrementare prin semnalul dec;
+- resetarea valorii prin semnalul count_reset.
+
+Valoarea counter-ului este pastrata pe 16 biti, intre 0x0000 si 0xFFFF. Am tratat separat si cazurile limita. Daca valoarea 0xFFFF este incrementata, counter-ul revine la 0x0000 si este activat semnalul overflow. Daca valoarea 0x0000 este decrementata, counter-ul trece la 0xFFFF si este activat semnalul underflow.
+
+Semnalele overflow si underflow sunt impulsuri de un singur ciclu de clock si sunt folosite ulterior pentru alegerea mesajului de avertizare transmis catre terminal.
+
+Valoarea counter-ului este conectata si la cele 16 LED-uri ale placii, astfel incat aceasta poate fi urmarita si in format binar.
+
+- [Codul modulului counter16b](src/counter16b.sv)
+
+
+### Simularea counter-ului
+
+Pentru verificarea modulului am testat incrementarea, decrementarea, resetarea si activarea simultana a semnalelor inc si dec.
+
+Am verificat si cazurile de overflow si underflow. La incrementarea valorii 0xFFFF, counter-ul a revenit la 0x0000 si semnalul overflow a fost activ pentru un singur ciclu. La decrementarea valorii 0x0000, counter-ul a trecut la 0xFFFF si a fost generat impulsul underflow.
+
+Simularea a confirmat ca modulul executa corect toate operatiile si ca resetul are prioritate fata de incrementare si decrementare.
+
+- [Testbench pentru counter16b](sim/test_counter16b.sv)
+
+![Simulare counter16b](images/test_counter16b.png)
+
+
+## Conversia valorii counter-ului in format ASCII
+
+Pentru afisarea valorii in terminal am realizat modulul counter_to_ascii. Acesta transforma valoarea binara pe 16 biti intr-un sir format din sase caractere ASCII, in formatul: 0xXXXX
+
+Cei 16 biti ai counter-ului sunt impartiti in patru grupe de cate 4 biti. Fiecare grupa reprezinta o cifra hexazecimala si este transformata in caracterul ASCII corespunzator.
+
+Pentru valorile de la 0 la 9 sunt generate caracterele ASCII 0-9, iar pentru valorile de la 10 la 15 sunt generate caracterele A-F. Literele sunt afisate cu majuscule, conform cerintei.
+
+De exemplu, pentru valoarea: count = 16'h3A7F modulul genereaza sirul: 0x3A7F
+
+Iesirea are 48 de biti, deoarece contine sase caractere, fiecare reprezentat pe 8 biti.
+
+- [Codul modulului counter_to_ascii](src/counter_to_ascii.sv)
+
+
+### Simularea conversiei ASCII
+
+Pentru verificarea modulului am aplicat valorile 0x0000, 0x0009, 0x000A, 0x12AB, 0x3A7F si 0xFFFF.
+
+In simulare am urmarit intrarea count in format hexazecimal si iesirea ascii_hex in format ASCII. Pentru fiecare valoare, modulul a generat corect sirul 0xXXXX, inclusiv cifrele hexazecimale A-F scrise cu majuscule.
+
+- [Testbench pentru counter_to_ascii](sim/test_counter_to_ascii.sv)
+
+![Simulare conversie ASCII](images/test_counter_to_ascii.png)
+
+

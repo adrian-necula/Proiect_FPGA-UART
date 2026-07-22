@@ -468,3 +468,65 @@ Simularea a confirmat transmiterea corecta a mesajului byte cu byte si oprirea t
 ![Simulare generator mesaje](images/test_message_sender.png)
 
 
+## Integrarea modulelor in top si simularea sistemului complet
+
+Pentru conectarea tuturor modulelor am realizat modulul top_uart_logger. In acest modul am legat receptia UART, cele doua FIFO-uri, decodorul de comenzi, modulul de control, counter-ul, convertorul binar-ASCII, generatorul de mesaje si transmitatorul UART.
+
+Fluxul comenzilor primite din terminal este:
+
+PuTTY -> uart_rx -> RX FIFO -> uart_command_decoder -> uart_command_control
+
+Modulul uart_command_control genereaza semnalele inc, dec si count_reset, care controleaza counter-ul pe 16 biti. Valoarea counter-ului este trimisa catre cele 16 LED-uri si catre modulul counter_to_ascii.
+
+Fluxul mesajelor transmise este:
+
+counter_to_ascii -> message_sender -> TX FIFO -> uart_tx -> PuTTY
+
+Am conectat TX FIFO la uart_tx astfel incat un caracter sa fie citit numai atunci cand FIFO-ul nu este gol si transmitatorul UART nu este ocupat.
+
+Pentru cele trei butoane am folosit separat lantul:
+
+button_sync -> debouncer -> edge_detector
+
+Astfel, fiecare apasare este sincronizata, filtrata si transformata intr-un impuls de un singur ciclu de clock.
+
+Am folosit modulul clk_wiz_uart pentru generarea clock-ului intern clk_sys. Resetul general este obtinut din butonul de reset si semnalul locked al Clocking Wizard-ului:
+
+rst_global = rst | !clk_locked
+
+In acest mod, toate modulele raman in reset pana cand clock-ul intern devine stabil.
+
+Butonul de reset al counter-ului este separat de resetul general. Astfel, apasarea acestuia reseteaza doar valoarea counter-ului si permite transmiterea mesajului corespunzator, fara sa reseteze intregul sistem.
+
+- [Codul modulului top_uart_logger](src/top_uart_logger.sv)
+
+
+### Simularea sistemului complet
+
+Pentru verificarea integrarii am realizat testbench-ul test_top_uart_logger.
+
+In simulare am folosit un baud rate mai mare decat cel utilizat pe placa, pentru a reduce timpul necesar transmiterii mesajelor. Aceasta modificare afecteaza doar viteza simularii, nu si functionarea modulelor.
+
+Am verificat urmatoarele situatii:
+
+- transmiterea automata a mesajului de bun venit dupa reset;
+- decrementarea valorii 0x0000 si aparitia underflow-ului;
+- incrementarea valorii 0xFFFF si aparitia overflow-ului;
+- incrementarea normala a counter-ului;
+- comanda de status;
+- comanda pentru meniul de ajutor;
+- primirea unui caracter necunoscut;
+- apasarea butoanelor de incrementare, decrementare si reset.
+
+Pentru comenzile UART am folosit un task care genereaza bitul de start, cei 8 biti de date si bitul de stop.
+
+In waveform am urmarit receptia caracterelor, comenzile decodate, semnalele de control ale counter-ului, valoarea afisata pe LED-uri, codurile mesajelor si transferul caracterelor prin TX FIFO catre uart_tx.
+
+Simularea a confirmat functionarea traseului complet:
+
+receptie comanda -> procesare -> modificare counter -> generare mesaj -> transmisie UART
+
+- [Testbench pentru top_uart_logger](sim/test_top_uart_logger.sv)
+
+![Simulare sistem complet](images/test_top_uart_logger1.png)
+![Simulare sistem complet](images/test_top_uart_logger2.png)

@@ -529,6 +529,7 @@ receptie comanda -> procesare -> modificare counter -> generare mesaj -> transmi
 - [Testbench pentru top_uart_logger](sim/test_top_uart_logger.sv)
 
 ![Simulare sistem complet](images/test_top_uart_logger1.png)
+
 ![Simulare sistem complet](images/test_top_uart_logger2.png)
 
 

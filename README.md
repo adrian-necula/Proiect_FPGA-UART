@@ -247,3 +247,16 @@ La transmisie, fiecare bit este mentinut pe iesire timp de CLKS_PER_BIT cicluri.
 Am adaugat si semnalele sample_acquisition, bit_start si uart_segment, pentru ca momentele de receptie si limitele fiecarui bit sa fie mai usor de urmarit in simulare.
 
 Noua implementare a facut temporizarea mai clara in waveform si permite schimbarea baud rate-ului direct prin parametrii CLK_FREQ si BAUD_RATE.
+
+
+## Etapa 2 — Logger interactiv cu counter binar - Cerinta:
+Porniți de la Etapa 1 funcțională și integrați counter-ul binar din proiectul anterior. FPGA-ul devine un dispozitiv care raportează pe terminal tot ce face și acceptă comenzi de la tastatură. Pe lângă comunicația cu PC-ul, apăsarea butoanelor fizice trebuie de asemenea raportată automat pe terminal.
+
+Pe lângă comenzile primite de la PC, la fiecare apăsare a unui buton fizic FPGA-ul trebuie să trimită automat, fără intervenție de la PC, un mesaj corespunzător evenimentului: apăsare buton de incrementare, decrementare, reset, precum și cazurile de overflow / underflow ale counter-ului — alegeți un format de mesaj consistent și documentat, similar ca stil cu răspunsurile din tabelul de comenzi. La pornirea sistemului (după reset inițial), FPGA-ul trebuie să trimită automat un mesaj de bun venit și o indicație scurtă că '?' afișează meniul de ajutor; formatarea exactă a meniului rămâne la alegerea voastră, atât timp cât este clară și consistentă cu restul mesajelor.
+
+## Rezolvare: 
+Pentru proiectarea Etapei 2 am pornit de la comunicatia UART realizata anterior si am urmarit sa obtinem un sistem care sa poata primi comenzi din terminal, sa modifice un counter pe 16 biti si sa raporteze inapoi fiecare actiune facuta.
+
+Am ales sa folosim doua FIFO-uri, unul pentru comenzile primite si unul pentru mesajele transmise, astfel incat datele sa nu se piarda atunci cand sistemul este ocupat. Comenzile sunt interpretate separat, iar valoarea counter-ului este transformata in formatul 0xXXXX pentru a putea fi afisata usor in terminal.
+
+Pentru butoane am reutilizat modulele de sincronizare, debounce si detectare de front, astfel incat o apasare sa produca o singura comanda. Am avut in vedere si cazurile de overflow, underflow, comenzile necunoscute, mesajul de bun venit si meniul de ajutor.

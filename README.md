@@ -263,6 +263,20 @@ Am ales sa folosesc doua FIFO-uri, unul pentru comenzile primite si unul pentru 
 Pentru butoane am reutilizat modulele de sincronizare, debounce si detectare de front, astfel incat o apasare sa produca o singura comanda. Am avut in vedere si cazurile de overflow, underflow, comenzile necunoscute, mesajul de bun venit si meniul de ajutor.
 
 
+## Schema bloc a sistemului
+
+Pentru a evidentia mai clar legatura dintre module, am realizat si o schema bloc a intregului sistem. In aceasta se observa traseul comenzilor primite prin UART, prelucrarea apasarilor de butoane, actualizarea counter-ului si generarea mesajelor transmise inapoi catre terminal.
+
+Schema surprinde cele doua fluxuri principale:
+- fluxul de receptie si interpretare a comenzilor: UART RX -> RX FIFO -> uart_command_decoder -> uart_command_control;
+- fluxul de generare si transmitere a raspunsurilor: counter16b / counter_to_ascii -> message_sender -> TX FIFO -> UART TX.
+
+De asemenea, pentru butoanele fizice am pastrat lantul: button_sync -> debouncer -> edge_detector,
+astfel incat fiecare apasare sa fie transformata intr-un singur impuls valid pentru modulul de control.
+
+![Schema bloc top_uart_logger](images/schema_bloc_top_uart_logger.jpeg)
+
+
 ## Adaugarea FIFO-urilor si decodarea comenzilor UART
 
 Pentru gestionarea datelor primite si transmise am adaugat doua FIFO-uri pe 8 biti, unul pentru receptie si unul pentru transmisie.

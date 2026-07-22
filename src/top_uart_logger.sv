@@ -19,9 +19,6 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
-
-`timescale 1ns / 1ps
-
 module top_uart_logger
     #(parameter integer CLK_FREQ = 100_000_000,
       parameter integer BAUD_RATE = 9_600

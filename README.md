@@ -530,3 +530,68 @@ receptie comanda -> procesare -> modificare counter -> generare mesaj -> transmi
 
 ![Simulare sistem complet](images/test_top_uart_logger1.png)
 ![Simulare sistem complet](images/test_top_uart_logger2.png)
+
+
+## Adaugarea fisierului de constrangeri si testarea pe placa
+
+Pentru implementarea proiectului pe placa Nexys A7-100T am actualizat fisierul de constrangeri astfel incat toate porturile modulului top_uart_logger sa fie conectate la resursele fizice corespunzatoare.
+
+Am conectat clock-ul principal al placii, cu frecventa de 100 MHz, la intrarea clk. Pentru resetul general am folosit butonul central BTNC.
+
+Butoanele counter-ului au fost configurate astfel:
+
+- BTNR - incrementarea counter-ului;
+- BTNL - decrementarea counter-ului;
+- BTND - resetarea counter-ului;
+- BTNC - resetarea generala a sistemului.
+
+Valoarea counter-ului este conectata la cele 16 LED-uri ale placii. Fiecare LED reprezinta cate un bit al valorii count, LED0 fiind bitul cel mai putin semnificativ, iar LED15 bitul cel mai semnificativ.
+
+Pentru comunicatia cu terminalul am folosit interfata USB-UART integrata pe placa:
+
+- uart_rx_in primeste datele transmise de calculator;
+- uart_tx_out transmite mesajele generate de FPGA catre calculator.
+
+Am configurat terminalul serial cu urmatorii parametri:
+
+- baud rate: 9600;
+- data bits: 8;
+- stop bits: 1;
+- parity: None;
+- flow control: None;
+- local echo: Off.
+
+Spre deosebire de simulare, unde am folosit un baud rate mai mare pentru reducerea timpului de executie, pe placa am utilizat valoarea reala de 9600 baud.
+
+- [Fisierul de constrangeri](constraints/top_uart.xdc)
+
+
+### Testarea comunicatiei pe placa
+
+Dupa generarea bitstream-ului am programat placa si am deschis terminalul serial corespunzator interfetei USB-UART.
+
+La apasarea butonului central de reset, sistemul transmite automat mesajul de pornire:
+
+UART Counter Logger
+Press ? for help
+
+Am testat comenzile transmise din terminal:
+
+- I si i pentru incrementare;
+- D si d pentru decrementare;
+- R si r pentru resetarea counter-ului;
+- S si s pentru afisarea valorii curente;
+- ? pentru afisarea meniului de ajutor;
+- un caracter necunoscut pentru verificarea mesajului de eroare.
+
+Pentru fiecare comanda, valoarea counter-ului a fost actualizata pe LED-uri si a fost transmis mesajul corespunzator in terminal.
+
+Am verificat si comenzile generate de butoanele fizice. Apasarea unui buton modifica valoarea counter-ului si transmite automat un mesaj, fara sa fie necesara introducerea unei comenzi de la calculator.
+
+Am testat si cazurile limita:
+
+- incrementarea valorii 0xFFFF produce overflow si revenirea la 0x0000;
+- decrementarea valorii 0x0000 produce underflow si trecerea la 0xFFFF.
+
+Prin aceasta testare am verificat functionarea completa a sistemului, de la comenzile primite prin UART si apasarile butoanelor pana la actualizarea LED-urilor si transmiterea mesajelor catre terminal.
+

@@ -430,7 +430,7 @@ Simularea a confirmat functionarea corecta a masinii de stari si alegerea mesaju
 
 - [Testbench pentru uart_command_control](sim/test_command_control.sv)
 
-![Simulare control comenzi](images/test_command_control.png)
+![Simulare control comenzi](images/test_command_control1.png)
 
 
 ## Generarea mesajelor pentru terminal

@@ -433,3 +433,62 @@ Simularea a confirmat functionarea corecta a masinii de stari si alegerea mesaju
 ![Simulare control comenzi](images/test_command_control1.png)
 
 
+## Generarea mesajelor pentru terminal
+
+Pentru transmiterea raspunsurilor am realizat modulul message_sender. Acesta primeste msg_code, valoarea counter-ului convertita in format ASCII si caracterul necunoscut, atunci cand este cazul.
+
+In functie de msg_code, modulul selecteaza mesajul care trebuie transmis. Am folosit urmatoarele formate:
+
+Contor incrementat. Valoare: 0x0001  
+Contor decrementat. Valoare: 0x0000  
+Contor resetat. Valoare: 0x0000  
+Valoarea contorului: 0x000A  
+Overflow. Valoare: 0x0000  
+Underflow. Valoare: 0xFFFF  
+Buton INC. Valoare: 0x0001  
+Buton DEC. Valoare: 0x0000  
+Buton RESET. Valoare: 0x0000  
+Comanda necunoscuta: X  
+
+Am adaugat si mesajul de bun venit:
+
+UART Counter Logger  
+Apasa ? pentru ajutor  
+
+Pentru comanda de ajutor este transmis urmatorul mesaj:
+
+Comenzi:  
+I/i - Incrementare  
+D/d - Decrementare  
+R/r - Reset  
+S/s - Status  
+? - Ajutor  
+
+Am folosit doua buffere cu dimensiuni fixe. normal_buffer este folosit pentru majoritatea mesajelor, iar long_buffer pentru mesajul de ajutor.
+
+Mesajul este incarcat in buffer prin concatenare. msg_length pastreaza numarul de caractere valide, iar char_index indica pozitia caracterului transmis.
+
+tx_fifo_din contine caracterul curent, iar tx_fifo_wr_en este activ doar atunci cand caracterul este valid si TX FIFO nu este plin.
+
+Daca tx_fifo_full devine 1, char_index nu mai creste, iar transmiterea continua dupa eliberarea FIFO-ului.
+
+Cand se ajunge la ultimul caracter, busy devine 0 si done devine 1 pentru un singur ciclu. Implicit, data_valid si tx_fifo_wr_en devin 0, iar zerourile ramase in buffer nu sunt transmise.
+
+- [Codul modulului message_sender](src/message_sender.sv)
+
+
+### Simularea generatorului de mesaje
+
+Pentru verificare am transmis succesiv mai multe coduri de mesaj si am modificat valoarea counter-ului in format ASCII.
+
+Pentru MSG_INC si valoarea 0x3A7F, pe tx_fifo_din am observat:
+
+Contor incrementat. Valoare: 0x3A7F
+
+char_index a crescut dupa fiecare caracter acceptat de FIFO, busy a ramas activ pe durata mesajului, iar done a generat un singur impuls la final.
+
+Simularea a confirmat selectarea si transmiterea corecta a mesajelor caracter cu caracter catre TX FIFO.
+
+- [Testbench pentru message_sender](sim/test_message_sender.sv)
+
+![Simulare generator mesaje](images/test_message_sender.png)

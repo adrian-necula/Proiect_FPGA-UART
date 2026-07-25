@@ -546,3 +546,37 @@ La final am asteptat golirea TX FIFO-ului si terminarea transmisiei UART, pentru
 ![Simulare sistem complet](images/test_top_uart_logger1.png)
 
 ![Simulare sistem complet](images/test_top_uart_logger2.png)
+
+
+## Adaugarea fisierului de constrangeri si testarea pe placa
+
+Pentru implementarea proiectului pe placuta am conectat porturile modulului top_uart_logger la resursele fizice ale placii.
+
+Am folosit:
+
+- clock-ul de 100 MHz pentru intrarea clk;
+- BTNC pentru resetul general;
+- BTNR pentru incrementare;
+- BTNL pentru decrementare;
+- BTND pentru resetarea counter-ului;
+- cele 16 LED-uri pentru afisarea valorii counter-ului.
+
+Pentru comunicatia cu calculatorul am folosit interfata USB-UART integrata. Terminalul a fost configurat la 9600 baud, 8 biti de date, un bit de stop, fara paritate si fara flow control.
+
+- [Fisierul de constrangeri](constraints/top_uart.xdc)
+
+
+### Testarea comunicatiei pe placa
+
+Dupa generarea bitstream-ului am programat placa si am deschis terminalul serial.
+
+La reset, sistemul transmite mesajul:
+
+UART Counter Logger  
+Apasa ? pentru ajutor  
+
+Am verificat comenzile de incrementare, decrementare, reset, status, ajutor si comanda necunoscuta. Pentru fiecare comanda, counter-ul s-a actualizat pe LED-uri si mesajul corespunzator a fost transmis in terminal.
+
+Am testat si cele trei butoane fizice, precum si cazurile de overflow si underflow.
+
+Testarea a confirmat functionarea completa a comunicatiei UART, actualizarea counter-ului si transmiterea mesajelor catre terminal.

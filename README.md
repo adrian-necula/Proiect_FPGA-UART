@@ -492,3 +492,57 @@ Simularea a confirmat selectarea si transmiterea corecta a mesajelor caracter cu
 - [Testbench pentru message_sender](sim/test_message_sender.sv)
 
 ![Simulare generator mesaje](images/test_message_sender.png)
+
+
+## Integrarea modulelor in top si simularea sistemului complet
+
+Pentru conectarea tuturor modulelor am realizat modulul top_uart_logger. In acesta am integrat receptia UART, cele doua FIFO-uri, decodorul de comenzi, modulul de control, counter-ul, convertorul ASCII, generatorul de mesaje si transmitatorul UART.
+
+Fluxul comenzilor primite este:
+
+PuTTY -> uart_rx -> RX FIFO -> uart_command_decoder -> uart_command_control
+
+Modulul uart_command_control genereaza semnalele inc, dec si count_reset, care controleaza counter-ul pe 16 biti. Valoarea acestuia este afisata pe LED-uri si convertita in format ASCII.
+
+Fluxul mesajelor transmise este:
+
+counter_to_ascii -> message_sender -> TX FIFO -> uart_tx -> PuTTY
+
+TX FIFO transmite un caracter catre uart_tx numai atunci cand FIFO-ul nu este gol si transmitatorul nu este ocupat.
+
+Pentru fiecare buton am folosit lantul:
+
+button_sync -> debouncer -> edge_detector
+
+Astfel, fiecare apasare este sincronizata, filtrata si transformata intr-un impuls de un singur ciclu de clock.
+
+Clock-ul intern este generat cu clk_wiz_uart, iar resetul general este:
+
+rst_global = rst | !clk_locked
+
+Toate modulele raman in reset pana cand clock-ul devine stabil. Butonul count_reset reseteaza doar counter-ul, fara sa reseteze intregul sistem.
+
+- [Codul modulului top_uart_logger](src/top_uart_logger.sv)
+
+
+### Simularea sistemului complet
+
+Pentru verificarea integrarii am realizat testbench-ul test_top_uart_logger.
+
+In simulare am folosit un baud rate mai mare pentru reducerea timpului de testare. Aceasta modificare afectand doar viteza simularii.
+
+Pentru comenzile UART am folosit un task care genereaza bitul de start, cei 8 biti de date si bitul de stop.
+
+In waveform am urmarit receptia caracterelor, comenzile decodate, valoarea counter-ului, codurile mesajelor si transferul caracterelor prin TX FIFO catre uart_tx.
+
+Simularea a confirmat functionarea traseului complet:
+
+receptie comanda -> procesare -> modificare counter -> generare mesaj -> transmisie UART
+
+La final am asteptat golirea TX FIFO-ului si terminarea transmisiei UART, pentru ca toate caracterele sa fie trimise inainte de oprirea simularii.
+
+- [Testbench pentru top_uart_logger](sim/test_top_uart_logger.sv)
+
+![Simulare sistem complet](images/test_top_uart_logger1.png)
+
+![Simulare sistem complet](images/test_top_uart_logger2.png)
